@@ -1,0 +1,11 @@
+#!/bin/bash
+cd ~/msc/DenseNet201/Vanilla
+python DenseNet201.py
+
+cd ~/msc/DenseNet201/Traditional
+python DenseNet201_traditional.py
+
+cd ~/msc/DenseNet201/GAN
+python DenseNet201_fake.py
+
+cd ~/msc/DenseNet201/

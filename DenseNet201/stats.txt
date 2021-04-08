@@ -1,0 +1,7 @@
+baseline:   93.94 |
+with GAN:   94.19 |
+with trad.: 94.86 |
+----------half dataset------------------
+baseline:   92.39 |
+with GAN    92.67 |
+with trad.: 92.55 |

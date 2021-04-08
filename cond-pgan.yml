@@ -1,0 +1,17 @@
+name: cond-pgan
+channels:
+  - conda-forge
+dependencies:
+  - python=3.6
+  - tensorflow-gpu=1.6
+  - cudnn=7.1.2
+  - numpy
+  - scipy
+  - moviepy
+  - Pillow
+  - lmdb
+  - opencv
+  - cryptography
+  - h5py
+  - six
+  - pip

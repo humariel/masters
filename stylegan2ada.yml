@@ -1,0 +1,19 @@
+name: stylegan2ada
+dependencies:
+  - python=3.6
+  - tensorflow-gpu=1.14
+  - cudatoolkit=10.0
+  - cudnn
+  - numpy
+  - scipy
+#  - moviepy  --> install manually if needed
+  - Pillow
+  - lmdb
+  - opencv
+  - cryptography
+  - h5py
+  - six
+  - pip
+  #need to also install these:
+  - requests
+  - nvcc_linux-64=10.0

@@ -1,0 +1,72 @@
+    def create_discriminator(self):
+        init = tf.keras.initializers.GlorotNormal()
+        # image input
+        in_image = layers.Input(shape=[32,32,3])
+        # ResBlocks
+        D = ResnetBlockDown(in_image, 128)
+        D = Attention(D, epsilon=1.0e-8)
+        D = ResnetBlockDown(D, 128)
+        D = ResnetBlock(D, 128)
+        D = ResnetBlock(D, 128)
+        D = layers.LeakyReLU(alpha=0.2)(D)
+        D = GlobalSumPooling2D()(D)
+        #last layer
+        D = layers.Flatten()(D)
+        # real/fake output
+        out1 = SpectralDense(1, epsilon=1.0e-8, kernel_initializer=init, activation='sigmoid', name='out_fake')(D)
+        # class label output
+        out2 = SpectralDense(self.n_classes, epsilon=1.0e-8, kernel_initializer=init, activation='softmax', name='out_aux')(D)
+        # define model
+        model = tf.keras.Model(in_image, [out1, out2], name="discriminator")
+        # compile model
+        opt = tf.keras.optimizers.Adam(lr=0.0001, beta_1=0.5, epsilon=1.0e-8)
+        model.compile(
+            loss=['binary_crossentropy', 'sparse_categorical_crossentropy'], 
+            optimizer=opt,
+            metrics={'out_fake': 'accuracy', 'out_aux': tf.keras.metrics.SparseCategoricalAccuracy()})
+        model.summary()
+        return model
+
+    def create_generator(self):
+        init = tf.keras.initializers.RandomNormal(stddev=0.02)
+        # label input
+        z = layers.Input(shape=(self.latent_dim,))
+        # this will be our label
+        y = layers.Input(shape=(1,), dtype='float32')
+
+        y_emb = SpectralDense(self.latent_dim, use_bias=False, epsilon=1.0e-8, kernel_initializer=init)(y)
+        c = layers.Concatenate()([z, y_emb])
+        G = SpectralDense(4*4*128, use_bias=False, epsilon=1.0e-8, kernel_initializer=init)(c)
+        G = layers.Reshape((4,4,128))(G)
+        # ResBlocks
+        G = ResnetBlockUp(G, c, 128)
+        G = ResnetBlockUp(G, c, 128)
+        G = Attention(G, epsilon=1.0e-8)
+        G = ResnetBlockUp(G, c, 128)
+        # End part
+        G = ConditionalBatchNormalization(G, c, momentum=0.99, epsilon=1.0e-8)
+        G = layers.LeakyReLU(alpha=0.2)(G)
+        G = SpectralConv2D(3, 3, epsilon=1.0e-8, padding="same", kernel_initializer=init)(G)
+        G = layers.Activation("tanh")(G)
+        # define model
+        model = tf.keras.Model([z, y], G, name="generator")
+        model.summary()
+        return model
+
+    def define_gan(self):
+        # make weights in the discriminator not trainable
+        self.discriminator.trainable = False
+        # connect the outputs of the generator to the inputs of the discriminator
+        gan_output = self.discriminator(self.generator.output)
+        # define gan model as taking noise and label and outputting real/fake and label outputs
+        model = tf.keras.Model(self.generator.input, gan_output)
+        # compile model
+        opt = tf.keras.optimizers.Adam(lr=0.0002, beta_1=0.5, epsilon=1.0e-8)
+        model.compile(loss=['binary_crossentropy', 'sparse_categorical_crossentropy'], optimizer=opt)
+        return model
+Batch Size : 64
+D steps per G step = 1
+-------------------------------------------
+IS = 7.2744 ± 0.0694
+FID = 29.6051
+Acc = 0.7883
