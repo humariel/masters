@@ -1,0 +1,6 @@
+#!/bin/bash
+cd ~/msc/Classifiers_ACGAN/ACGAN
+./runNets
+
+cd ~/msc/Classifiers_ACGAN/BigGAN
+./runNets

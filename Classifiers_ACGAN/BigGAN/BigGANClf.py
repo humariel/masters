@@ -42,6 +42,8 @@ model = create_discriminator()
 
 # load cifar-10
 (train_x, train_y), (test_x, test_y) = cifar10.load_data()
+train_x = train_x.astype('float32')
+train_x = (train_x - 127.5) / 127.5
 
 history = model.fit(train_x, train_y,
                     batch_size=64,

@@ -44,13 +44,15 @@ model = create_discriminator()
 
 # load cifar-10
 (train_x, train_y), (test_x, test_y) = cifar10.load_data()
+train_x = train_x.astype('float32')
+train_x = (train_x - 127.5) / 127.5
 
 history = model.fit(train_x, train_y,
                     batch_size=64,
                     epochs=200)
 
 print(history.history)
-with open('baseClf.p', "wb") as f_history:
+with open('BaseClf.p', "wb") as f_history:
     pickle.dump(history.history, f_history)
 
-model.save('baseClf.h5')
+model.save('BaseClf.h5')

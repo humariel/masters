@@ -1,0 +1,6 @@
+#!/bin/bash
+cd ~/msc/Classifiers_ACGAN/ACGAN/
+python BaseClf.py
+
+cd ~/msc/Classifiers_ACGAN/ACGAN/
+python BaseClf_fake.py
