@@ -16,11 +16,11 @@ import PIL
 from math import sqrt
 from scipy.stats import truncnorm
 # modules
-from Ops.spectral_normalization import SpectralConv2D, SpectralDense
-from Ops.ops import ResnetBlock, ResnetBlockUp, ResnetBlockDown
-from Ops.attention import Attention
-from Ops.global_sum_pooling import GlobalSumPooling2D
-from Ops.conditional_batch_normalization import ConditionalBatchNormalization
+from OriginalOps.spectral_normalization import SpectralConv2D, SpectralDense
+from OriginalOps.ops import ResnetBlock, ResnetBlockUp, ResnetBlockDown
+from OriginalOps.attention import Attention
+from OriginalOps.global_sum_pooling import GlobalSumPooling2D
+from OriginalOps.conditional_batch_normalization import ConditionalBatchNormalization
 
 from functools import partial
 
@@ -92,15 +92,15 @@ class ACGAN():
         
 
     def create_discriminator(self):
-        init = tf.keras.initializers.GlorotNormal()
+        init = tf.keras.initializers.Orthogonal()
         # image input
         in_image = layers.Input(shape=[32,32,3])
         # ResBlocks
-        D = ResnetBlockDown(in_image, 128)
+        D = ResnetBlockDown(in_image, 96)
         D = Attention(D, epsilon=1.0e-8)
-        D = ResnetBlockDown(D, 128)
-        D = ResnetBlock(D, 128)
-        D = ResnetBlock(D, 128)
+        D = ResnetBlockDown(D, 192)
+        D = ResnetBlock(D, 384)
+        D = ResnetBlock(D, 384)
         D = layers.LeakyReLU(alpha=0.2)(D)
         D = GlobalSumPooling2D()(D)
         #last layer
@@ -112,16 +112,16 @@ class ACGAN():
         # define model
         model = tf.keras.Model(in_image, [out1, out2], name="discriminator")
         # compile model
-        opt = tf.keras.optimizers.Adam(lr=0.0001, beta_1=0.5, epsilon=1.0e-8)
+        opt = tf.keras.optimizers.Adam(lr=0.0002, beta_1=0.0, beta_2=0.999 ,epsilon=1.0e-8)
         model.compile(
-            loss=['binary_crossentropy', 'sparse_categorical_crossentropy'], 
+            loss=['hinge', 'sparse_categorical_crossentropy'], 
             optimizer=opt,
             metrics={'out_fake': 'accuracy', 'out_aux': tf.keras.metrics.SparseCategoricalAccuracy()})
         model.summary()
         return model
 
     def create_generator(self):
-        init = tf.keras.initializers.RandomNormal(stddev=0.02)
+        init = tf.keras.initializers.Orthogonal()
         # label input
         z = layers.Input(shape=(self.latent_dim,))
         # this will be our label
@@ -129,13 +129,13 @@ class ACGAN():
 
         y_emb = SpectralDense(self.latent_dim, use_bias=False, epsilon=1.0e-8, kernel_initializer=init)(y)
         c = layers.Concatenate()([z, y_emb])
-        G = SpectralDense(4*4*128, use_bias=False, epsilon=1.0e-8, kernel_initializer=init)(c)
-        G = layers.Reshape((4,4,128))(G)
+        G = SpectralDense(4*4*384, use_bias=False, epsilon=1.0e-8, kernel_initializer=init)(c)
+        G = layers.Reshape((4,4,384))(G)
         # ResBlocks
-        G = ResnetBlockUp(G, c, 128)
-        G = ResnetBlockUp(G, c, 128)
+        G = ResnetBlockUp(G, c, 384)
+        G = ResnetBlockUp(G, c, 192)
         G = Attention(G, epsilon=1.0e-8)
-        G = ResnetBlockUp(G, c, 128)
+        G = ResnetBlockUp(G, c, 96)
         # End part
         G = ConditionalBatchNormalization(G, c, momentum=0.99, epsilon=1.0e-8)
         G = layers.LeakyReLU(alpha=0.2)(G)
@@ -156,8 +156,8 @@ class ACGAN():
         # define gan model as taking noise and label and outputting real/fake and label outputs
         model = tf.keras.Model(self.generator.input, gan_output)
         # compile model
-        opt = tf.keras.optimizers.Adam(lr=0.0002, beta_1=0.5, epsilon=1.0e-8)
-        model.compile(loss=['binary_crossentropy', 'sparse_categorical_crossentropy'], optimizer=opt)
+        opt = tf.keras.optimizers.Adam(lr=0.00005, beta_1=0.0, beta_2=0.999, epsilon=1.0e-8)
+        model.compile(loss=['hinge', 'sparse_categorical_crossentropy'], optimizer=opt)
         return model
 
 
@@ -229,7 +229,7 @@ class ACGAN():
             for i in range(batches_per_epoch):
                 progress_bar.update(i)
                 #train D more times than G
-                for _ in range(1):
+                for _ in range(2):
                     #train on batch here
                     [X_real, labels_real], y_real = self.generate_real_samples(train_x, train_y, batch_size, i)
                     # update discriminator model weights
@@ -278,7 +278,7 @@ class ACGAN():
 
 
 if __name__ == "__main__":
-    batch_size = 64
+    batch_size = 512
     (train_x, train_y), (test_x, test_y) = cifar10.load_data()
     
     #val_size = 5000
@@ -292,7 +292,7 @@ if __name__ == "__main__":
     train_x = train_x.astype('float32')
     train_x = (train_x - 127.5) / 127.5
     # automatically create new model name from existing folders
-    base_name = 'bigacgan-cifar10-'
+    base_name = 'bigacganO-cifar10-'
     numbers = [int(name.split('-')[-1]) for name in os.listdir("./history") if os.path.isdir('./history/'+name) and len(name.split('-'))==3]
     name = base_name + str(numbers[-1]+1)
     # create model

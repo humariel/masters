@@ -5,6 +5,7 @@ import pickle
 import os
 import numpy as np
 from PIL import Image
+import argparse
 
 # GENERATED IMAGES
 BASE_DIR = os.getcwd() + "/../../Datasets"
