@@ -53,10 +53,9 @@ def save_plot(examples, filename):
 
 
 class BigACGAN():
-    def __init__(self, truncation=2.0, latent_dim=128, n_classes=10, model_name="bigacgan", discriminator=None, generator=None):
+    def __init__(self, truncation=2.0, latent_dim=128, model_name="bigacgan", discriminator=None, generator=None):
         self.truncation = truncation
         self.latent_dim = latent_dim
-        self.n_classes = n_classes
         self.model_name = model_name
         #setup paths
         if not os.path.exists('./history/bigacgan/{}'.format(model_name)):
@@ -117,7 +116,7 @@ class BigACGAN():
         # real/fake output
         out1 = SpectralDense(1, epsilon=1.0e-8, kernel_initializer=init, activation='sigmoid', name='out_fake')(D)
         # class label output
-        out2 = SpectralDense(self.n_classes, epsilon=1.0e-8, kernel_initializer=init, activation='softmax', name='out_aux')(D)
+        out2 = SpectralDense(1, epsilon=1.0e-8, kernel_initializer=init, activation='softmax', name='out_aux')(D)
         # define model
         model = tf.keras.Model(in_image, [out1, out2], name="discriminator")
         # compile model
@@ -182,7 +181,7 @@ class BigACGAN():
         z_input = truncnorm.rvs(-2, 2, size=(n_samples, self.latent_dim), random_state=None).astype(np.float32)
         z_input = z_input * self.truncation
         # generate labels
-        labels = np.random.randint(0, self.n_classes, n_samples)
+        labels = np.random.randint(0, 1, n_samples)
         return [z_input, labels]
 
     # use the generator to generate n fake examples, with class labels
@@ -197,14 +196,12 @@ class BigACGAN():
 
 
     # generate points in latent space as input for the generator
-    # n_sanples  should be a power of self.n_classes
     def generate_latent_points_all_classes(self, n_samples):
         # generate points in the latent space
         z_input = truncnorm.rvs(-2, 2, size=(n_samples, self.latent_dim), random_state=None).astype(np.float32)
         z_input = z_input * self.truncation
         # generate labels
-        n = int(sqrt(n_samples))
-        labels = np.asarray([c for c in range(n) for _ in range(n)])
+        labels = np.asarray([c for c in range(2) for _ in range(n_samples//2)])
         return [z_input, labels]
 
 
@@ -213,7 +210,7 @@ class BigACGAN():
         # plot images
         fig = plt.figure(figsize=(32., 32.))
         grid = ImageGrid(fig, 111,  # similar to subplot(111)
-                    nrows_ncols=(10, 10),  # creates 4x4 grid of axes
+                    nrows_ncols=(10, 10),  # creates 10x10 grid of axes
                     axes_pad=0,  # pad between axes in inch.
                     )
 
@@ -318,5 +315,5 @@ if __name__ == "__main__":
     else : 
         name = base_name + str(numbers[-1]+1)
     # create model
-    acgan = BigACGAN(truncation=2.0, n_classes=10, model_name=name)
+    acgan = BigACGAN(truncation=2.0, model_name=name)
     d_fake_losses, d_real_losses, g_losses = acgan.train(train_gen, val_gen, epochs=250, batch_size=batch_size, batches_per_epoch=batches_per_epoch)
