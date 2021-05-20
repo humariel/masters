@@ -25,6 +25,8 @@ from Ops.conditional_batch_normalization import ConditionalBatchNormalization
 
 from functools import partial
 
+from util import *
+
 # generate points in latent space as input for the generator
 def generate_latent_points_class(latent_dim, n_samples, n_class):
     # generate points in the latent space
@@ -50,8 +52,8 @@ def save_plot(examples, filename):
     plt.savefig(filename)
 
 
-class ACGAN():
-    def __init__(self, truncation=2.0, latent_dim=128, n_classes=10, model_name="acgan", discriminator=None, generator=None):
+class BigACGAN():
+    def __init__(self, truncation=2.0, latent_dim=128, n_classes=10, model_name="bigacgan", discriminator=None, generator=None):
         self.truncation = truncation
         self.latent_dim = latent_dim
         self.n_classes = n_classes
@@ -121,7 +123,7 @@ class ACGAN():
         # compile model
         opt = tf.keras.optimizers.Adam(lr=0.0002, beta_1=0.5, epsilon=1.0e-8)
         model.compile(
-            loss=['binary_crossentropy', 'sparse_categorical_crossentropy'], 
+            loss=['binary_crossentropy', 'binary_crossentropy'], 
             optimizer=opt,
             metrics={'out_fake': 'accuracy', 'out_aux': tf.keras.metrics.SparseCategoricalAccuracy()})
         model.summary()
@@ -162,7 +164,7 @@ class ACGAN():
         model = tf.keras.Model(self.generator.input, gan_output)
         # compile model
         opt = tf.keras.optimizers.Adam(lr=0.0002, beta_1=0.5, epsilon=1.0e-8)
-        model.compile(loss=['binary_crossentropy', 'sparse_categorical_crossentropy'], optimizer=opt)
+        model.compile(loss=['binary_crossentropy', 'binary_crossentropy'], optimizer=opt)
         return model
 
 
@@ -324,9 +326,9 @@ if __name__ == "__main__":
     val_set = (val_x, val_y)
     test_set = (test_x, test_y)
     # automatically create new model name from existing folders
-    base_name = 'bigacgan-cifar10-1'
-    #numbers = [int(name.split('-')[-1]) for name in os.listdir("./history/bigacgan/") if os.path.isdir('./history/bigacgan/'+name) and len(name.split('-'))==3]
-    name = base_name #+ str(numbers[-1]+1)
+    base_name = 'bigacgan-mel_nv-'
+    numbers = [int(name.split('-')[-1]) for name in os.listdir("./history/bigacgan/") if os.path.isdir('./history/bigacgan/'+name) and len(name.split('-'))==3]
+    name = base_name + str(numbers[-1]+1)
     # create model
-    acgan = ACGAN(truncation=2.0, n_classes=10, model_name=name)
+    acgan = BigACGAN(truncation=2.0, n_classes=10, model_name=name)
     d_fake_losses, d_real_losses, g_losses = acgan.train(train_set, val_set, test_set, epochs=250, batch_size=batch_size, batches_per_epoch=train_x.shape[0]//batch_size)
