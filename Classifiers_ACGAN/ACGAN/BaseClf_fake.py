@@ -9,30 +9,27 @@ import argparse
 
 # GENERATED IMAGES
 BASE_DIR = os.getcwd() + "/../../Datasets"
-CIFAR_FAKE_DIR = BASE_DIR + "/cifar-10-generated/"
+CIFAR_FAKE_DIR = BASE_DIR + "/cifar-10-generated_stylegan2-ada/"
 
 def create_discriminator():
-    init = tf.keras.initializers.RandomNormal()
     # image input
     in_image = layers.Input(shape=[32,32,3])
-    #Gaussian Noise to help with overfit
-    D = layers.GaussianNoise(0.15)(in_image)
     #convolution
-    D = layers.Conv2D(64, (5,5), strides=(2,2), padding='same', kernel_initializer=init)(D)
+    D = layers.Conv2D(64, (5,5), strides=(2,2), padding='same', kernel_initializer='glorot_normal')(in_image)
     D = layers.LeakyReLU(alpha=0.2)(D)
-    D = layers.Dropout(0.3)(D)
+    D = layers.Dropout(0.5)(D)
     #convolution
-    D = layers.Conv2D(128, (5,5), strides=(2,2), padding='same', kernel_initializer=init)(D)
+    D = layers.Conv2D(128, (5,5), strides=(2,2), padding='same', kernel_initializer='glorot_normal')(D)
     D = layers.LeakyReLU(alpha=0.2)(D)
-    D = layers.Dropout(0.3)(D)
+    D = layers.Dropout(0.5)(D)
     #convolution
-    D = layers.Conv2D(256, (5,5), strides=(2,2), padding='same', kernel_initializer=init)(D)
+    D = layers.Conv2D(256, (5,5), strides=(2,2), padding='same', kernel_initializer='glorot_normal')(D)
     D = layers.LeakyReLU(alpha=0.2)(D)
-    D = layers.Dropout(0.3)(D)
+    D = layers.Dropout(0.5)(D)
     #convolution
-    D = layers.Conv2D(512, (5,5), strides=(2,2), padding='same', kernel_initializer=init)(D)
+    D = layers.Conv2D(512, (5,5), strides=(2,2), padding='same', kernel_initializer='glorot_normal')(D)
     D = layers.LeakyReLU(alpha=0.2)(D)
-    D = layers.Dropout(0.3)(D)
+    D = layers.Dropout(0.5)(D)
     #last layer
     D = layers.Flatten()(D)
     # class label output
@@ -112,12 +109,15 @@ def main(halve):
     train_y = train_y[shuffle]
     train_x = train_x.astype('float32')
     train_x = (train_x - 127.5) / 127.5
+    val_x = val_x.astype('float32')
+    val_x = (val_x - 127.5) / 127.5
 
     model = create_discriminator()
 
     history = model.fit(train_x, train_y,
                         batch_size=64,
-                        epochs=200)
+                        epochs=250,
+                        validation_data=(val_x, val_y))
 
     print(history.history)
     with open(history_name, "wb") as f_history:
@@ -126,7 +126,7 @@ def main(halve):
     model.save(model_name)
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='DenseNet trainer')
+    parser = argparse.ArgumentParser(description='description')
     parser.add_argument('--halve', default=False, action='store_true')
     args = parser.parse_args()
 

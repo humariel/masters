@@ -1,0 +1,5 @@
+#!/bin/bash
+python calc_fids.py bigacgan-cifar10-2
+python calc_fids.py bigacgan-cifar10-3
+python calc_fids.py bigacgan-cifar10-4
+python calc_fids.py bigacgan-cifar10-5

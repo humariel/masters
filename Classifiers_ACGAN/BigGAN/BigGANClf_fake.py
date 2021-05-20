@@ -16,14 +16,15 @@ from Ops.conditional_batch_normalization import ConditionalBatchNormalization
 
 # GENERATED IMAGES
 BASE_DIR = os.getcwd() + "/../../Datasets"
-CIFAR_FAKE_DIR = BASE_DIR + "/cifar-10-generated/"
+CIFAR_FAKE_DIR = BASE_DIR + "/cifar-10-generated_stylegan2-ada/"
 
 def create_discriminator():
     init = tf.keras.initializers.GlorotNormal()
     # image input
     in_image = layers.Input(shape=[32,32,3])
+    D = layers.Conv2D(128, 5, padding="same", kernel_initializer=init)(in_image)
     # ResBlocks
-    D = ResnetBlockDown(in_image, 128)
+    D = ResnetBlockDown(D, 128)
     D = Attention(D, epsilon=1.0e-8)
     D = ResnetBlockDown(D, 128)
     D = ResnetBlock(D, 128)
@@ -37,7 +38,7 @@ def create_discriminator():
     # define model
     model = tf.keras.Model(in_image, out, name="discriminator")
     # compile model
-    opt = tf.keras.optimizers.Adam(lr=0.0001, beta_1=0.5, epsilon=1.0e-8)
+    opt = tf.keras.optimizers.Adam(lr=0.0002, beta_1=0.5, epsilon=1.0e-8)
     model.compile(
         loss=['sparse_categorical_crossentropy'], 
         optimizer=opt,
@@ -49,11 +50,11 @@ def create_discriminator():
 def main(halve):
 
     if halve:
-        model_name = 'BigGANClf_fake_halved.h5'
-        history_name = "BigGANClf_fake_halved.p"
+        model_name = 'BigGANClf_fake_halved_v2.h5'
+        history_name = "BigGANClf_fake_halved_v2.p"
     else:
-        model_name = 'BigGANClf_fake.h5'
-        history_name = "BigGANClf_fake.p"
+        model_name = 'BigGANClf_fake_v2.h5'
+        history_name = "BigGANClf_fake_v2.p"
 
     fakes = []
     fake_labels = []
@@ -106,21 +107,22 @@ def main(halve):
     #join generated to train data
     train_x = np.concatenate((train_x, fake_train_x))
     train_y = np.concatenate((train_y, fake_train_y))
-    print(train_x.shape)
-    print(train_y.shape)
     # shuffle x and y in the same way
     shuffle = np.random.permutation(len(train_x))
     train_x = train_x[shuffle]
     train_y = train_y[shuffle]
     train_x = train_x.astype('float32')
     train_x = (train_x - 127.5) / 127.5
+    val_x = val_x.astype('float32')
+    val_x = (val_x - 127.5) / 127.5
 
     model = create_discriminator()
 
 
     history = model.fit(train_x, train_y,
                         batch_size=64,
-                        epochs=200)
+                        epochs=250,
+                        validation_data=(val_x, val_y))
 
     print(history.history)
     with open(history_name, "wb") as f_history:

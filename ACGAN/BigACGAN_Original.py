@@ -238,7 +238,7 @@ class ACGAN():
                     # generate 'fake' examples
                     [X_fake, labels_fake], y_fake = self.generate_fake_samples(batch_size)
                     # update discriminator model weights
-                    d_fake_loss = self.discriminator.train_on_batch(X_fake, [y_fake, labels_real], return_dict=True)
+                    d_fake_loss = self.discriminator.train_on_batch(X_fake, [y_fake, labels_fake], return_dict=True)
                 
                 # prepare points in latent space as input for the generator
                 [z_input, z_labels] = self.generate_latent_points(batch_size)

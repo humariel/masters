@@ -1,5 +1,4 @@
 import glob
-from util import *
 #tensorlfow
 import tensorflow as tf
 from tensorflow.keras import layers
@@ -9,55 +8,50 @@ from tensorflow.keras.utils import Progbar
 import inspect
 import pickle
 import time
-import util
 import matplotlib
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import ImageGrid
 import numpy as np
 import os
 import PIL
 from math import sqrt
-from scipy.stats import truncnorm
-# modules
-from Ops.spectral_normalization import SpectralConv2D, SpectralDense
-from Ops.ops import ResnetBlock, ResnetBlockUp, ResnetBlockDown
-from Ops.attention import Attention
-from Ops.global_sum_pooling import GlobalSumPooling2D
-from Ops.conditional_batch_normalization import ConditionalBatchNormalization
-
-from functools import partial
 
 # generate points in latent space as input for the generator
-def generate_latent_points_class(latent_dim, n_samples, n_class):
+# n_sanples  should be a power of self.n_classes
+def generate_latent_points_all_classes(latent_dim, n_samples):
     # generate points in the latent space
     z_input = np.random.randn(n_samples, latent_dim)
+    z_input = z_input.reshape(n_samples, latent_dim)
     # generate labels
-    labels = np.asarray([n_class for _ in range(n_samples)])
+    n = int(sqrt(n_samples))
+    labels = np.asarray([c for c in range(n) for _ in range(n)])
     return [z_input, labels]
 
-
 # create and save a plot of generated images
-def save_plot(examples, n_examples, filename):
+def save_plot(examples, filename):
     # plot images
-    for i in range(n_examples):
-        # define subplot
-        plt.subplot(sqrt(n_examples), sqrt(n_examples), 1 + i)
-        # turn off axis
-        plt.axis('off')
-        # plot raw pixel data
-        plt.imshow(examples[i, :, :, :])
+    fig = plt.figure(figsize=(16., 16.))
+    grid = ImageGrid(fig, 111,  # similar to subplot(111)
+                 nrows_ncols=(10, 10),  # creates 4x4 grid of axes
+                 axes_pad=0,  # pad between axes in inch.
+                 )
+
+    for ax, im in zip(grid, examples):
+        # Iterating over the grid returns the Axes.
+        ax.imshow(im)
+        ax.axis('off')
     plt.savefig(filename)
 
 
 class ACGAN():
-    def __init__(self, latent_dim=100, n_classes=10, model_name="acgan", discriminator=None, generator=None):
-        self.truncation = truncation
+    def __init__(self, latent_dim=110, n_classes=10, model_name="acgan", discriminator=None, generator=None):
         self.latent_dim = latent_dim
         self.n_classes = n_classes
         self.model_name = model_name
         #setup paths
-        if not os.path.exists('./history/{}'.format(model_name)):
-            os.makedirs('./history/{}'.format(model_name))
-        self.history_prefix = './history/{}'.format(self.model_name)
+        if not os.path.exists('./history/acgan/{}'.format(model_name)):
+            os.makedirs('./history/acgan/{}'.format(model_name))
+        self.history_prefix = './history/acgan/{}'.format(self.model_name)
 
         if not os.path.exists('{}/evaluation'.format(self.history_prefix)):
             os.makedirs('{}/evaluation'.format(self.history_prefix))
@@ -84,36 +78,36 @@ class ACGAN():
         D_lines = inspect.getsource(self.create_discriminator)
         G_lines = inspect.getsource(self.create_generator)
         C_lines = inspect.getsource(self.define_gan)
+        t_lines = inspect.getsource(self.train)
         with open('{}/models.txt'.format(self.history_prefix), 'w') as f:
             f.write(D_lines)
             f.write('\n')
             f.write(G_lines)
             f.write('\n')
             f.write(C_lines)
+            f.write('\n')
+            f.write(t_lines)
             f.close()
         
     def create_discriminator(self):
-        init = tf.keras.initializers.RandomNormal()
         # image input
         in_image = layers.Input(shape=[32,32,3])
-        #Gaussian Noise to help with overfit
-        D = layers.GaussianNoise(0.15)(in_image)
         #convolution
-        D = layers.Conv2D(64, (5,5), strides=(2,2), padding='same', kernel_initializer=init)(D)
+        D = layers.Conv2D(64, (5,5), strides=(2,2), padding='same', kernel_initializer='glorot_normal')(in_image)
         D = layers.LeakyReLU(alpha=0.2)(D)
-        D = layers.Dropout(0.3)(D)
+        D = layers.Dropout(0.5)(D)
         #convolution
-        D = layers.Conv2D(128, (5,5), strides=(2,2), padding='same', kernel_initializer=init)(D)
+        D = layers.Conv2D(128, (5,5), strides=(2,2), padding='same', kernel_initializer='glorot_normal')(D)
         D = layers.LeakyReLU(alpha=0.2)(D)
-        D = layers.Dropout(0.3)(D)
+        D = layers.Dropout(0.5)(D)
         #convolution
-        D = layers.Conv2D(256, (5,5), strides=(2,2), padding='same', kernel_initializer=init)(D)
+        D = layers.Conv2D(256, (5,5), strides=(2,2), padding='same', kernel_initializer='glorot_normal')(D)
         D = layers.LeakyReLU(alpha=0.2)(D)
-        D = layers.Dropout(0.3)(D)
+        D = layers.Dropout(0.5)(D)
         #convolution
-        D = layers.Conv2D(512, (5,5), strides=(2,2), padding='same', kernel_initializer=init)(D)
+        D = layers.Conv2D(512, (5,5), strides=(2,2), padding='same', kernel_initializer='glorot_normal')(D)
         D = layers.LeakyReLU(alpha=0.2)(D)
-        D = layers.Dropout(0.3)(D)
+        D = layers.Dropout(0.5)(D)
         #last layer
         D = layers.Flatten()(D)
         # real/fake output
@@ -123,7 +117,7 @@ class ACGAN():
         # define model
         model = tf.keras.Model(in_image, [out1, out2], name="discriminator")
         # compile model
-        opt = tf.keras.optimizers.Adam(lr=0.0002, beta_1=0.5)
+        opt = tf.keras.optimizers.Adam(lr=0.00005, beta_1=0.5)
         model.compile(
             loss=['binary_crossentropy', 'sparse_categorical_crossentropy'], 
             optimizer=opt,
@@ -132,7 +126,6 @@ class ACGAN():
         return model
 
     def create_generator(self):
-        init = tf.keras.initializers.RandomNormal(stddev=0.02)
         # label input
         latent = layers.Input(shape=(self.latent_dim,))
         # this will be our label
@@ -143,20 +136,20 @@ class ACGAN():
 
         # hadamard product between z-space and a class conditional embedding
         G = layers.multiply([latent, flt])
-        G = layers.Dense(4*4*256, kernel_initializer=init)(G)
+        G = layers.Dense(4*4*256, kernel_initializer='glorot_normal')(G)
         G = layers.BatchNormalization()(G)
         G = layers.LeakyReLU(alpha=0.2)(G)
         G = layers.Reshape((4,4,256))(G)
         # upsample
-        G = layers.Conv2DTranspose(128, (5,5), strides=(2,2), padding='same', kernel_initializer=init)(G)
+        G = layers.Conv2DTranspose(128, (5,5), strides=(2,2), padding='same', kernel_initializer='glorot_normal')(G)
         G = layers.BatchNormalization()(G)
         G = layers.LeakyReLU(alpha=0.2)(G)
         # upsample
-        G = layers.Conv2DTranspose(64, (5,5), strides=(2,2), padding='same', kernel_initializer=init)(G)
+        G = layers.Conv2DTranspose(64, (5,5), strides=(2,2), padding='same', kernel_initializer='glorot_normal')(G)
         G = layers.BatchNormalization()(G)
         G = layers.LeakyReLU(alpha=0.2)(G)
         # upsample
-        G = layers.Conv2DTranspose(3, (5,5), strides=(2,2), padding='same', kernel_initializer=init)(G)
+        G = layers.Conv2DTranspose(3, (5,5), strides=(2,2), padding='same', kernel_initializer='glorot_normal')(G)
         G = layers.Activation('tanh')(G)
 
         # define model
@@ -176,7 +169,6 @@ class ACGAN():
         model.compile(loss=['binary_crossentropy', 'sparse_categorical_crossentropy'], optimizer=opt)
         return model
 
-
     def generate_real_samples(self, train_x, train_y, n_samples, index):
         # select images and labels
         X = train_x[index*n_samples:(index+1)*n_samples]
@@ -188,7 +180,7 @@ class ACGAN():
     # generate points in latent space as input for the generator
     def generate_latent_points(self, n_samples):
         # generate points in the latent space
-        z_input = np.random.randn(n_samples, latent_dim)
+        z_input = np.random.randn(n_samples, self.latent_dim)
         z_input = z_input.reshape(n_samples, self.latent_dim)
         # generate labels
         labels = np.random.randint(0, self.n_classes, n_samples)
@@ -209,7 +201,7 @@ class ACGAN():
     # n_sanples  should be a power of self.n_classes
     def generate_latent_points_all_classes(self, n_samples):
         # generate points in the latent space
-        z_input = np.random.randn(n_samples, latent_dim)
+        z_input = np.random.randn(n_samples, self.latent_dim)
         z_input = z_input.reshape(n_samples, self.latent_dim)
         # generate labels
         n = int(sqrt(n_samples))
@@ -218,22 +210,31 @@ class ACGAN():
  
 
     # create and save a plot of generated images
-    def save_plot(self,examples, n_examples, filename):
+    def save_plot(self,examples, filename):
         # plot images
-        for i in range(n_examples):
-            # define subplot
-            plt.subplot(sqrt(n_examples), sqrt(n_examples), 1 + i)
-            # turn off axis
-            plt.axis('off')
-            # plot raw pixel data
-            plt.imshow(examples[i, :, :, :])
+        fig = plt.figure(figsize=(16., 16.))
+        grid = ImageGrid(fig, 111,  # similar to subplot(111)
+                    nrows_ncols=(10, 10),  # creates 4x4 grid of axes
+                    axes_pad=0,  # pad between axes in inch.
+                    )
+
+        for ax, im in zip(grid, examples):
+            # Iterating over the grid returns the Axes.
+            ax.imshow(im)
+            ax.axis('off')
         plt.savefig(filename)
 
 
-    def train(self, train_x, train_y, batches_per_epoch, epochs=100, batch_size=32):
+    def train(self, train_set, val_set, test_set, batches_per_epoch, epochs=100, batch_size=32):
+        train_x, train_y = train_set 
+        val_x, val_y = val_set 
+        test_x, test_y = test_set 
+
         d_real_losses = []
         d_fake_losses = []
         g_losses = []
+        val_losses = []
+        test_losses = []
 
         if not batches_per_epoch: 
             batches_per_epoch = train_x.shape[0]//batch_size
@@ -254,7 +255,7 @@ class ACGAN():
                     # generate 'fake' examples
                     [X_fake, labels_fake], y_fake = self.generate_fake_samples(batch_size)
                     # update discriminator model weights
-                    d_fake_loss = self.discriminator.train_on_batch(X_fake, [y_fake, labels_real], return_dict=True)
+                    d_fake_loss = self.discriminator.train_on_batch(X_fake, [y_fake, labels_fake], return_dict=True)
                 
                 # prepare points in latent space as input for the generator
                 [z_input, z_labels] = self.generate_latent_points(batch_size)
@@ -265,13 +266,20 @@ class ACGAN():
             
             print('\nD_Real_loss: {};\nD_Fake_loss: {};\nG_loss:      {}; \nTime for epoch {} is {} sec'.format(d_real_loss,d_fake_loss,g_loss,epoch+1,time.time()-start))
 
+            # test on validation & test sets
+            val_loss =  self.discriminator.evaluate(val_x, [np.ones((val_x.shape[0], 1)), val_y], return_dict=True)
+            test_loss =  self.discriminator.evaluate(test_x, [np.ones((test_x.shape[0], 1)), test_y], return_dict=True)
+            
             d_real_losses.append(d_real_loss)
             d_fake_losses.append(d_fake_loss)
             g_losses.append(g_loss)
+            val_losses.append(val_loss)
+            test_losses.append(test_loss)
 
+            self.generator.save('{}/generator-e{}.h5'.format(self.training_checkpoints_prefix, epoch+1))
             # Save the model every x epochs
             if (epoch + 1) % 10 == 0 or  (epoch + 1) < 10:
-                self.generator.save('{}/generator-e{}.h5'.format(self.training_checkpoints_prefix, epoch+1))
+                #self.generator.save('{}/generator-e{}.h5'.format(self.training_checkpoints_prefix, epoch+1))
                 self.discriminator.save('{}/discriminator-e{}.h5'.format(self.training_checkpoints_prefix, epoch+1))
 
                 # generate an image of 100 fake images (10 per class)
@@ -279,7 +287,7 @@ class ACGAN():
                 latent_points, labels = self.generate_latent_points_all_classes(100)
                 X = self.generator.predict([latent_points, labels])
                 X = (X+1) / 2
-                self.save_plot(X, 100, filename)
+                self.save_plot(X, filename)
 
                 with open("{}/d_fake_losses.p".format(self.evaluation_prefix), "wb") as fp:
                     pickle.dump(d_fake_losses, fp)
@@ -287,6 +295,10 @@ class ACGAN():
                     pickle.dump(d_real_losses, fp)
                 with open("{}/g_losses.p".format(self.evaluation_prefix), "wb") as fp:
                     pickle.dump(g_losses, fp)
+                with open("{}/val_losses.p".format(self.evaluation_prefix), "wb") as fp:
+                    pickle.dump(val_losses, fp)
+                with open("{}/test_losses.p".format(self.evaluation_prefix), "wb") as fp:
+                    pickle.dump(test_losses, fp)
 
         self.generator.save('{}/generator-e{}.h5'.format(self.training_checkpoints_prefix, epochs))
         self.discriminator.save('{}/discriminator-e{}.h5'.format(self.training_checkpoints_prefix, epochs))
@@ -297,20 +309,28 @@ if __name__ == "__main__":
     batch_size = 64
     (train_x, train_y), (test_x, test_y) = cifar10.load_data()
     
-    #val_size = 5000
+    val_size = 5000
     # take val_size images from train to use as validation
-    #val_x = train_x[-val_size:]
-    #val_y = train_y[-val_size:]
+    val_x = train_x[-val_size:]
+    val_y = train_y[-val_size:]
     # and now remove them from the train data
-    #train_x = train_x[:-val_size]
-    #train_y = train_y[:-val_size]
+    train_x = train_x[:-val_size]
+    train_y = train_y[:-val_size]
 
     train_x = train_x.astype('float32')
     train_x = (train_x - 127.5) / 127.5
+    val_x = val_x.astype('float32')
+    val_x = (val_x - 127.5) / 127.5
+    test_x = test_x.astype('float32')
+    test_x = (test_x - 127.5) / 127.5
+
+    train_set = (train_x, train_y)
+    val_set = (val_x, val_y)
+    test_set = (test_x, test_y)
     # automatically create new model name from existing folders
     base_name = 'acgan-cifar10-'
-    numbers = [int(name.split('-')[-1]) for name in os.listdir("./history") if os.path.isdir('./history/'+name) and len(name.split('-'))==3]
-    name = base_name + str(numbers[-1]+1)
+    numbers = [int(name.split('-')[-1]) for name in os.listdir("./history/acgan") if os.path.isdir('./history/acgan/'+name) and len(name.split('-'))==3]
+    name = base_name + str(max(numbers)+1)
     # create model
     acgan = ACGAN(n_classes=10, model_name=name)
-    d_fake_losses, d_real_losses, g_losses = acgan.train(train_x, train_y, epochs=200, batch_size=batch_size, batches_per_epoch=train_x.shape[0]//batch_size)
+    d_fake_losses, d_real_losses, g_losses = acgan.train(train_set, val_set, test_set, epochs=250, batch_size=batch_size, batches_per_epoch=train_x.shape[0]//batch_size)

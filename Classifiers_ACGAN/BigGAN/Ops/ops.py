@@ -10,10 +10,10 @@ from .conditional_batch_normalization import ConditionalBatchNormalization
 def ResnetBlock(x, filters):
     init = tf.keras.initializers.GlorotNormal()
     y = layers.LeakyReLU(alpha=0.2)(x)
-    y = layers.Dropout(0.3)(y)
+    y = layers.Dropout(0.5)(y)
     y = SpectralConv2D(filters, 5, epsilon=1.0e-8, padding="same", kernel_initializer=init)(y)
     y = layers.LeakyReLU(alpha=0.2)(y)
-    y = layers.Dropout(0.3)(y)
+    y = layers.Dropout(0.5)(y)
     y = SpectralConv2D(filters, 5, epsilon=1.0e-8, padding="same", kernel_initializer=init)(y)
 
     z = SpectralConv2D(filters, 1, epsilon=1.0e-8, padding="same", kernel_initializer=init)(x)
@@ -23,10 +23,10 @@ def ResnetBlock(x, filters):
 def ResnetBlockDown(x, filters):
     init = tf.keras.initializers.GlorotNormal()
     y = layers.LeakyReLU(alpha=0.2)(x)
-    y = layers.Dropout(0.3)(y)
+    y = layers.Dropout(0.5)(y)
     y = SpectralConv2D(filters, 5, epsilon=1.0e-8, padding="same", kernel_initializer=init)(y)
     y = layers.LeakyReLU(alpha=0.2)(y)
-    y = layers.Dropout(0.3)(y)
+    y = layers.Dropout(0.5)(y)
     y = SpectralConv2D(filters, 5, epsilon=1.0e-8, padding="same", kernel_initializer=init)(y)
     y = layers.AveragePooling2D()(y)
 
