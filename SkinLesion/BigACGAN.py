@@ -168,10 +168,10 @@ class BigACGAN():
         return model
 
 
-    def generate_real_samples(self, train_x, train_y, n_samples, index):
+    def generate_real_samples(self, image_generator):
         # select images and labels
-        X = train_x[index*n_samples:(index+1)*n_samples]
-        labels = train_y[index*n_samples:(index+1)*n_samples]
+        X,labels = image_generator.next()
+        labels = y.reshape((batch_size,1))
         # generate class labels
         y = np.ones((n_samples, 1))
         return [X, labels], y
@@ -206,7 +206,7 @@ class BigACGAN():
         n = int(sqrt(n_samples))
         labels = np.asarray([c for c in range(n) for _ in range(n)])
         return [z_input, labels]
- 
+
 
     # create and save a plot of generated images
     def save_plot(self,examples, filename):
@@ -224,19 +224,12 @@ class BigACGAN():
         plt.savefig(filename)
 
 
-    def train(self, train_set, val_set, test_set, batches_per_epoch, epochs=100, batch_size=32):
-        train_x, train_y = train_set 
-        val_x, val_y = val_set 
-        test_x, test_y = test_set 
+    def train(self, train_gen, val_gen, batches_per_epoch, epochs=100, batch_size=32):
 
         d_real_losses = []
         d_fake_losses = []
         g_losses = []
         val_losses = []
-        test_losses = []
-
-        if not batches_per_epoch: 
-            batches_per_epoch = train_x.shape[0]//batch_size
 
         for epoch in range(epochs):
             print('Starting epoch {}'.format(epoch+1))
@@ -247,7 +240,9 @@ class BigACGAN():
                 #train D more times than G
                 for _ in range(1):
                     #train on batch here
-                    [X_real, labels_real], y_real = self.generate_real_samples(train_x, train_y, batch_size, i)
+                    [X_real, labels_real], y_real = self.generate_real_samples(train_gen)
+                    print(X_real.shape)
+                    print(labels_real.shape)
                     # update discriminator model weights
                     d_real_loss = self.discriminator.train_on_batch(X_real, [y_real, labels_real], return_dict=True)
                     
@@ -265,15 +260,15 @@ class BigACGAN():
             
             print('\nD_Real_loss: {};\nD_Fake_loss: {};\nG_loss:      {}; \nTime for epoch {} is {} sec'.format(d_real_loss,d_fake_loss,g_loss,epoch+1,time.time()-start))
 
-            # test on validation & test sets
-            val_loss =  self.discriminator.evaluate(val_x, [np.ones((val_x.shape[0], 1)), val_y], return_dict=True)
-            test_loss =  self.discriminator.evaluate(test_x, [np.ones((test_x.shape[0], 1)), test_y], return_dict=True)
+            # test on validation set
+            # VAL_GEN BATCH_SIZE SHOULD BE ENTIRETY OF THE VALIDATION SET, I.E. ALL SAMPLE AT ONCE
+            val_x, val_y = val_gen.next()
+            val_loss =  self.discriminator.evaluate(val_x, [np.ones((val_gen.batch_size, 1)), val_y], return_dict=True)
 
             d_real_losses.append(d_real_loss)
             d_fake_losses.append(d_fake_loss)
             g_losses.append(g_loss)
             val_losses.append(val_loss)
-            test_losses.append(test_loss)
 
             self.generator.save('{}/generator-e{}.h5'.format(self.training_checkpoints_prefix, epoch+1))
             # Save the model every x epochs
@@ -295,8 +290,6 @@ class BigACGAN():
                     pickle.dump(g_losses, fp)
                 with open("{}/val_losses.p".format(self.evaluation_prefix), "wb") as fp:
                     pickle.dump(val_losses, fp)
-                with open("{}/test_losses.p".format(self.evaluation_prefix), "wb") as fp:
-                    pickle.dump(test_losses, fp)
 
         self.generator.save('{}/generator-e{}.h5'.format(self.training_checkpoints_prefix, epochs))
         self.discriminator.save('{}/discriminator-e{}.h5'.format(self.training_checkpoints_prefix, epochs))
@@ -304,31 +297,26 @@ class BigACGAN():
 
 
 if __name__ == "__main__":
-    batch_size = 64
-    (train_x, train_y), (test_x, test_y) = cifar10.load_data()
     
-    val_size = 5000
-    # take val_size images from train to use as validation
-    val_x = train_x[-val_size:]
-    val_y = train_y[-val_size:]
-    # and now remove them from the train data
-    train_x = train_x[:-val_size]
-    train_y = train_y[:-val_size]
+    base_data_dir = "../Datasets/SkinLesion_Mel_NV/"
+    train_data_dir = base_data_dir + "train/"
+    val_data_dir = base_data_dir + "val/"
+    test_data_dir = base_data_dir + "test/"
 
-    train_x = train_x.astype('float32')
-    train_x = (train_x - 127.5) / 127.5
-    val_x = val_x.astype('float32')
-    val_x = (val_x - 127.5) / 127.5
-    test_x = test_x.astype('float32')
-    test_x = (test_x - 127.5) / 127.5
+    batch_size = 64
+    image_size = (256, 256)
 
-    train_set = (train_x, train_y)
-    val_set = (val_x, val_y)
-    test_set = (test_x, test_y)
+    train_gen, val_gen, _ = load_skin_lesion_dataset(train_data_dir, val_data_dir, test_data_dir, batch_size=batch_size)
+
+    batches_per_epoch = train_gen.n//train_gen.batch_size
+
     # automatically create new model name from existing folders
     base_name = 'bigacgan-mel_nv-'
     numbers = [int(name.split('-')[-1]) for name in os.listdir("./history/bigacgan/") if os.path.isdir('./history/bigacgan/'+name) and len(name.split('-'))==3]
-    name = base_name + str(numbers[-1]+1)
+    if len(numbers) == 0:
+        name = base_name + '0'
+    else : 
+        name = base_name + str(numbers[-1]+1)
     # create model
     acgan = BigACGAN(truncation=2.0, n_classes=10, model_name=name)
-    d_fake_losses, d_real_losses, g_losses = acgan.train(train_set, val_set, test_set, epochs=250, batch_size=batch_size, batches_per_epoch=train_x.shape[0]//batch_size)
+    d_fake_losses, d_real_losses, g_losses = acgan.train(train_gen, val_gen, epochs=250, batch_size=batch_size, batches_per_epoch=batches_per_epoch)

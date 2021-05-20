@@ -30,14 +30,14 @@ def load_skin_lesion_dataset(train_data_dir, val_data_dir, test_data_dir, target
     val_gen = data_gen.flow_from_directory(
         val_data_dir, 
         target_size=target_size, 
-        batch_size=batch_size, 
+        batch_size=500, 
         class_mode="binary",
         )
 
     test_gen = data_gen.flow_from_directory(
         test_data_dir, 
         target_size=target_size, 
-        batch_size=batch_size, 
+        batch_size=522, 
         class_mode="binary",
         )
 
@@ -49,9 +49,20 @@ if __name__=='__main__':
     val_data_dir = base_data_dir + "val/"
     test_data_dir = base_data_dir + "test/"
 
-    train_gen, val_gen, test_gen = load_skin_lesion_dataset(train_data_dir, val_data_dir, test_data_dir)
+    batch_size = 64
 
-    train_iterator = train_gen.flow()
+    train_gen, val_gen, test_gen = load_skin_lesion_dataset(train_data_dir, val_data_dir, test_data_dir, batch_size=batch_size)
 
-    batch = train_iterator.next()
-    print(batch)
+    """batches_per_epoch = train_gen.n//train_gen.batch_size
+
+    for batch in range(batches_per_epoch):
+        x,y = train_gen.next()
+        y = y.reshape((batch_size,1))
+        print(batch)
+    print('epoch done')
+    """
+    batches_per_epoch = val_gen.n//val_gen.batch_size
+
+    x,y = val_gen.next()
+    print(y.shape)
+    #for batch in range(batches_per_epoch):
