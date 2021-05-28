@@ -1,9 +1,9 @@
-name: experiments
+name: experiments22
 channels:
   - conda-forge
 dependencies:
   - python=3.7
-  - tensorflow-gpu=2.4.1
+  - tensorflow-gpu
   - tensorflow-estimator
   - matplotlib=3.0.2
   - numpy

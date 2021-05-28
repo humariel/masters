@@ -30,14 +30,14 @@ def load_skin_lesion_dataset(train_data_dir, val_data_dir, test_data_dir, target
     val_gen = data_gen.flow_from_directory(
         val_data_dir, 
         target_size=target_size, 
-        batch_size=400, 
+        batch_size=batch_size, 
         class_mode="binary",
         )
 
     test_gen = data_gen.flow_from_directory(
         test_data_dir, 
         target_size=target_size, 
-        batch_size=400, 
+        batch_size=batch_size, 
         class_mode="binary",
         )
 
