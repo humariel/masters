@@ -7,3 +7,4 @@ Classifiers_ACGAN/*/*.h5
 DenseNet201/*/*.h5
 early_experiments/training_checkpoints/*
 early_experiments/history/*/training_checkpoints/*.h5
+SkinLesion/history/*/training_checkpoints/*.h5
